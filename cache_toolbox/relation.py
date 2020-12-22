@@ -76,7 +76,80 @@ from django.db.models.signals import post_save, post_delete
 from .core import get_instance, delete_instance
 
 
-def cache_relation(descriptor, timeout=None):
+def cache_forwards_relation(descriptor, timeout=None):
+    """
+    Given a model Bazz with a foriegn key to Foo, cache the relation Bazz.foo.
+    """
+    field = descriptor.field
+    related_name = '%s_cache' % field.name
+
+    @property
+    def get(self):
+        # Handle nullable foreign key values upfront, after this we can assume
+        # that any 'None' values aren't valid.
+        instance_pk = getattr(self, field.attname)
+        if instance_pk is None:
+            return None
+
+        # Always use the cached "real" instance if available
+        if descriptor.is_cached(self):
+            return descriptor.__get__(self)
+
+        # Lookup cached instance
+        try:
+            instance = getattr(self, '_%s_cache' % related_name)
+        except AttributeError:
+            # no local cache
+            pass
+        else:
+            if instance is None:
+                # we (locally) cached that there is no model
+                raise field.related_model.DoesNotExist(
+                    "%s matching query does not exist." % (
+                        field.related_model.__name__,
+                    ),
+                )
+            return instance
+
+        try:
+            instance = get_instance(
+                field.related_model,
+                instance_pk,
+                timeout,
+                using=self._state.db,
+            )
+            setattr(self, '_%s_cache' % related_name, instance)
+        except field.related_model.DoesNotExist:
+            setattr(self, '_%s_cache' % related_name, None)
+            raise
+
+        return instance
+
+    setattr(field.model, related_name, get)
+
+    # Clearing cache
+
+    def clear(self):
+        delete_instance(field.related_model, self)
+
+    @classmethod
+    def clear_pk(cls, *instances_or_pk):
+        delete_instance(field.related_model, *instances_or_pk)
+
+    def clear_cache(sender, instance, *args, **kwargs):
+        delete_instance(field.related_model, instance)
+
+    setattr(field.model, '%s_clear' % related_name, clear)
+    setattr(field.model, '%s_clear_pk' % related_name, clear_pk)
+
+    post_save.connect(clear_cache, sender=field.model, weak=False)
+    post_delete.connect(clear_cache, sender=field.model, weak=False)
+
+
+def cache_reverse_relation(descriptor, timeout=None):
+    """
+    Given a model Bazz with a foriegn key to Foo, cache the relation Foo.bazz.
+    """
     rel = descriptor.related
 
     if not rel.field.primary_key:
@@ -150,3 +223,10 @@ def cache_relation(descriptor, timeout=None):
 
     post_save.connect(clear_cache, sender=rel.related_model, weak=False)
     post_delete.connect(clear_cache, sender=rel.related_model, weak=False)
+
+
+def cache_relation(descriptor, timeout=None):
+    if hasattr(descriptor, 'field'):
+        return cache_forwards_relation(descriptor, timeout)
+    else:
+        return cache_reverse_relation(descriptor, timeout)

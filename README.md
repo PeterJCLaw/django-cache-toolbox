@@ -37,6 +37,11 @@ foo = Foo.get_cached(pk=42)
 
 # Load a cached relation
 print(foo.bazz_cache)
+
+bazz = Bazz.objects.get(foo_id=42)
+
+# Load a cached relation (the other way)
+print(bazz.foo_cache)
 ```
 
 See the module docstrings for further details.

@@ -15,5 +15,17 @@ class Bazz(models.Model):
 
     value = models.IntegerField(null=True)
 
+class Quox(models.Model):
+    foo = models.OneToOneField(
+        Foo,
+        related_name='quox',
+        on_delete=models.CASCADE,
+        null=True,
+    )
+
+    val = models.IntegerField(null=True)
+
 cache_model(Foo)
 cache_relation(Foo.bazz)
+cache_relation(Bazz.foo)
+cache_relation(Quox.foo)
