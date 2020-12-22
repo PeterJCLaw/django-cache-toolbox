@@ -16,3 +16,20 @@ class Bazz(models.Model):
 
 cache_model(Foo)
 cache_relation(Foo.bazz)
+
+class MultipleForeignKey(models.Model):
+    name = models.TextField()
+
+    foo = models.OneToOneField(
+        Foo,
+        related_name='multiple_foreign_key',
+        on_delete=models.CASCADE,
+    )
+    bazz = models.OneToOneField(
+        Bazz,
+        related_name='multiple_foreign_key',
+        on_delete=models.CASCADE,
+    )
+
+cache_relation(Foo.multiple_foreign_key)
+cache_relation(Bazz.multiple_foreign_key)

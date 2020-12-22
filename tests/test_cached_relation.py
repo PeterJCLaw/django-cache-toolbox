@@ -36,6 +36,29 @@ class CachedRelationTest(TestCase):
             "Foo should have 'bazz_cache' attribute",
         )
 
+    def test_cached_relation_different_pks(self):
+        foo = Foo.objects.create(pk=1, bar='bees')
+
+        Bazz.objects.create(pk=2, foo=foo, value=10)
+
+        # Populate the cache
+        Foo.objects.get(pk=foo.pk).bazz_cache
+
+        # Get from the cache
+        cached_object = Foo.objects.get(pk=foo.pk).bazz_cache
+
+        self.assertEqual(cached_object.value, 10)
+
+        self.assertTrue(
+            hasattr(foo, 'bazz'),
+            "Foo should have 'bazz' attribute",
+        )
+
+        self.assertTrue(
+            hasattr(foo, 'bazz_cache'),
+            "Foo should have 'bazz_cache' attribute",
+        )
+
     def test_cached_relation_not_present_hasattr(self):
         foo = Foo.objects.create(bar='bees_2')
 
